@@ -2,7 +2,7 @@
 #include "llsql/dev/logging.h"
 #include "llsql/utils/attributes.h"
 #include "llsql/utils/string_.h"
-#include <signal.h>
+#include <stdio.h>
 
 /*
 code error :
@@ -11,14 +11,6 @@ code error :
 */
 
 #define LINE_SIZE 4096
-
-static volatile sig_atomic_t run = 1;
-
-static void HandleSigint(int32 sig)
-{
-    (void)sig;
-    run = 0;
-}
 
 static bool IsDisplayQuery(const char *sql)
 {
@@ -34,13 +26,12 @@ static bool IsDisplayQuery(const char *sql)
 
 int32 main(int32 argc, char **argv)
 {
+
     if (argc < 2)
     {
         LOG_ERROR("Usage : ./llsql <databasename>");
         return 1;
     }
-
-    signal(SIGINT, HandleSigint);
 
     sqlite3 *db = DbCreate(argv[1]);
 
@@ -49,28 +40,36 @@ int32 main(int32 argc, char **argv)
         return 2;
     }
 
-    LOG_INFO("CTRL+C to exit.");
+    LOG_INFO_B("CTRL+C to exit.");
 
     char line[LINE_SIZE];
 
-    while (run)
+    while (true)
     {
-        printf("llsql> ");
+        LOG_BEGIN();
+
+        fprintf(stdout, LOG_COLOR_INPUT);
         fflush(stdout);
 
         if (fgets(line, sizeof(line), stdin) == NULL)
         {
+            fprintf(stdout, LOG_COLOR_RESET);
+            fflush(stdout);
             break;
         }
 
+        fprintf(stdout, LOG_COLOR_RESET);
+        fflush(stdout);
+
         char *trimmed = SkipSpaces(TrimNewline(line));
+
         if (*trimmed == '\0')
             continue;
 
-        // Command likes SELECT, etc...
+        // Command like SELECT, etc...
         if (IsDisplayQuery(trimmed))
         {
-            LOG_DEBUG("Executing display query: %s", trimmed);
+            LOG_DEBUG_B("Executing display query: %s", trimmed);
 
             DbResult res = DbFetch(db, trimmed);
 
@@ -82,32 +81,33 @@ int32 main(int32 argc, char **argv)
                 ncols = kv_size(kv_A(res.rows, 0).cols);
             }
 
-            LOG_DEBUG("Query result: %llu row(s), %llu column(s)", (unsigned long long)nrows,
-                      (unsigned long long)ncols);
+            LOG_DEBUG_B("Query result: %llu row(s), %llu column(s)", (uint64)nrows, (uint64)ncols);
 
             DbResultPrint(&res);
 
-            LOG_DEBUG("Display query completed.");
+            LOG_DEBUG_B("Display query completed.");
 
             DbResultFree(&res);
         }
+        // Command like INSERT, CREATE, etc...
         else
         {
-            // Command likes INSERT, CREATE, etc...
-            LOG_DEBUG("Executing write query: %s", trimmed);
+            LOG_DEBUG_B("Executing write query: %s", trimmed);
 
             if (!DbWrite(db, trimmed))
             {
-                LOG_ERROR("Writing failed for query: %s", trimmed);
+                LOG_ERROR_B("Writing failed for query: %s", trimmed);
             }
             else
             {
-                LOG_DEBUG("Write query completed successfully.");
+                LOG_DEBUG_B("Write query completed successfully.");
             }
         }
     }
 
-    LOG_INFO("Data base closing..");
+    LOG_INFO("Database closing...");
+
     DbClose(db);
+
     return 0;
 }

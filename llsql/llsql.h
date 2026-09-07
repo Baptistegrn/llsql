@@ -11,10 +11,10 @@ BEGIN_DECLARATIONS
 typedef enum
 {
     INTEGER = 0,
-    FLOAT = 1,
+    FLOAT_ = 1, // to avoid conflit with window include
     TEXT = 2,
     DATA = 3,
-    VOID = 4
+    VOID_ = 4 // to avoid conflit with window include
 } DbType;
 
 typedef struct

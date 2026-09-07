@@ -11,7 +11,7 @@ static sqlite3_stmt *DbPrepareInternal(sqlite3 *db, const char *sql)
 {
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
-        LOG_ERROR("%s", sqlite3_errmsg(db));
+        LOG_ERROR_B("%s", sqlite3_errmsg(db));
     return stmt;
 }
 
@@ -30,12 +30,12 @@ sqlite3 *DbCreate(const char *name)
 {
     if (!DbExists(name))
     {
-        LOG_WARN("%s", "Database does not exist, creating one.");
+        LOG_WARNING_B("%s", "Database does not exist, creating one.");
     }
     sqlite3 *db = NULL;
     if (UNLIKELY(sqlite3_open(name, &db) != SQLITE_OK))
     {
-        LOG_ERROR("%s", name ? sqlite3_errmsg(db) : "unknown error");
+        LOG_ERROR_B("%s", name ? sqlite3_errmsg(db) : "unknown error");
         if (db)
             sqlite3_close(db);
         return NULL;
@@ -59,7 +59,7 @@ bool DbWrite(sqlite3 *db, const char *sql)
 
     if (rc != SQLITE_DONE && rc != SQLITE_ROW)
     {
-        LOG_ERROR("%s", sqlite3_errmsg(db));
+        LOG_ERROR_B("%s", sqlite3_errmsg(db));
         return false;
     }
     return true;
@@ -90,7 +90,7 @@ static DbResult DbResultGet(sqlite3_stmt *stmt)
                 v.value.i = sqlite3_column_int64(stmt, i);
                 break;
             case SQLITE_FLOAT:
-                v.type = FLOAT;
+                v.type = FLOAT_;
                 v.value.f = sqlite3_column_double(stmt, i);
                 break;
             case SQLITE_TEXT:
@@ -106,7 +106,7 @@ static DbResult DbResultGet(sqlite3_stmt *stmt)
                 break;
             }
             case SQLITE_NULL:
-                v.type = VOID;
+                v.type = VOID_;
                 break;
             }
 
@@ -117,7 +117,7 @@ static DbResult DbResultGet(sqlite3_stmt *stmt)
     }
 
     if (rc != SQLITE_DONE)
-        LOG_ERROR("%s", sqlite3_errmsg(sqlite3_db_handle(stmt)));
+        LOG_ERROR_B("%s", sqlite3_errmsg(sqlite3_db_handle(stmt)));
 
     return result;
 }
@@ -140,7 +140,7 @@ static int FormatDbValue(const DbValue *v, char *buf, uint64 bufsize)
     case INTEGER:
         return snprintf(buf, bufsize, "%lld", (long long)v->value.i);
 
-    case FLOAT:
+    case FLOAT_:
         return snprintf(buf, bufsize, "%g", v->value.f);
 
     case TEXT:
@@ -149,7 +149,7 @@ static int FormatDbValue(const DbValue *v, char *buf, uint64 bufsize)
     case DATA:
         return snprintf(buf, bufsize, "[BLOB %llu octets]", (unsigned long long)v->value.blob.size);
 
-    case VOID:
+    case VOID_:
         return snprintf(buf, bufsize, "NULL");
 
     default:
