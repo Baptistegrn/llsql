@@ -1,4 +1,4 @@
-#include "cjson/cjson.h"
+#include "cjson/cJSON.h"
 #include <sqlite3.h>
 #include <stdio.h>
 
