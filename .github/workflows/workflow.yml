@@ -3,7 +3,9 @@ name: Build
 on:
   push:
     branches: ["**"]
-    tags: ["v*.*.*"]
+    tags:
+      - "v*.*.*"
+      - "test-v*.*.*" # for test workflow
   pull_request:
 
 jobs:
