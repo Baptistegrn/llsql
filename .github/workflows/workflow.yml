@@ -1,0 +1,147 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*.*.*"]
+  pull_request:
+
+jobs:
+  # clang-format validation
+  format:
+    runs-on: ubuntu-22.04
+    name: "clang-format"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          find llsql -type f \( -name '*.c' -o -name '*.h' \) -print0 \
+            | xargs -0 -r clang-format --dry-run --Werror
+
+  # compilation
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, runner: ubuntu-22.04, platform: linux-x64, buildtype: release }
+          - { os: ubuntu-22.04-arm, runner: ubuntu-22.04-arm, platform: linux-arm64, buildtype: release }
+          - { os: macos-latest, runner: macos-latest, platform: macos-arm64, buildtype: release }
+          - { os: macos-15-intel, runner: macos-15-intel, platform: macos-x64, buildtype: release }
+          - { os: windows-latest, runner: windows-latest, platform: windows-x64, buildtype: release }
+          - { os: windows-11-arm, runner: windows-11-arm, platform: windows-arm64, buildtype: release }
+
+    runs-on: ${{ matrix.runner }}
+    name: "${{ matrix.buildtype }} / ${{ matrix.runner }}"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: latest
+          actions-cache-folder: '.xmake-cache-${{ matrix.platform }}'
+          package-cache: true
+          build-cache: true
+
+      - name: Remove homebrew freetype
+        if: runner.os == 'macOS'
+        run: brew uninstall --ignore-dependencies freetype
+
+      - name: Configure
+        run: >
+          xmake config --clean
+          -m ${{ matrix.buildtype }}
+          -y -vv
+
+      - name: Build
+        run: xmake build -y -vv
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "${{ matrix.platform }}-${{ matrix.buildtype }}"
+          path: |
+            build/
+
+  # creation of the release
+  release:
+    name: Create GitHub Release
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Package artifacts per architecture
+        shell: bash
+        run: |
+          mkdir -p release-assets
+
+          PLATFORMS="linux-x64 linux-arm64 macos-x64 macos-arm64 windows-x64 windows-arm64"
+          TAG="${GITHUB_REF_NAME}"
+
+          for platform in $PLATFORMS; do
+            STAGE_DIR="staging_${platform}"
+            ARTIFACT_DIR="artifacts/${platform}-release"
+
+            mkdir -p "${STAGE_DIR}"
+
+            if [ ! -d "${ARTIFACT_DIR}" ]; then
+              rm -rf "${STAGE_DIR}"
+              continue
+            fi
+
+            BIN_PATH=$(find "${ARTIFACT_DIR}" -type f \( -name "llsql" -o -name "llsql.exe" \) | head -n 1)
+
+            if [ -z "${BIN_PATH}" ]; then
+              rm -rf "${STAGE_DIR}"
+              continue
+            fi
+
+            cp "${BIN_PATH}" "${STAGE_DIR}/"
+
+            if [[ "$platform" == *"windows"* ]]; then
+              cp setup/setup.bat "${STAGE_DIR}/"
+            else
+              cp setup/setup.sh "${STAGE_DIR}/"
+              chmod +x "${STAGE_DIR}/setup.sh"
+              chmod +x "${STAGE_DIR}"/llsql* 2>/dev/null || true
+            fi
+
+            ARCHIVE_NAME="${platform}-${TAG}.zip"
+
+            cd "${STAGE_DIR}"
+            zip -r "../release-assets/${ARCHIVE_NAME}" .
+            cd ..
+            rm -rf "${STAGE_DIR}"
+          done
+
+          ls -lh release-assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Release ${{ github.ref_name }}"
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: release-assets/*.zip
