@@ -1,8 +1,6 @@
 #pragma once
 
 #include "llsql/utils/c_cpp.h"
-
-#include <corecrt_math.h>
 #include <stdbool.h>
 #include <stdio.h>
 
