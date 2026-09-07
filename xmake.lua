@@ -8,6 +8,7 @@ end
 -- requires
 add_requires("sqlite3",{version = "3-3.53.0+0"}, {configs = {shared = false}, system = false})
 add_requires("cjson",{configs = {shared = false}})
+add_requires("klib",{version = "2024.06.03"}, {configs = {shared = false}})
 
 set_warnings("all", "extra")
 
@@ -21,7 +22,7 @@ target("llsql")
     set_targetdir(path.join("$(builddir)",""))             
 
     -- packages
-    add_packages( "cjson","sqlite3",
+    add_packages( "cjson","sqlite3","klib",
         {public = true}
     )
 
