@@ -12,5 +12,10 @@ echo "Available commands:"
 
 for exe in "$EXECUTABLE_DIR"/*; do
     [ -e "$exe" ] || continue
-    echo "  $(basename "$exe")"
+
+    filename="$(basename "$exe")"
+
+    if [ "$filename" != "setup.sh" ]; then
+        echo "  $filename"
+    fi
 done
