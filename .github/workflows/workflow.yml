@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           find llsql -type f \( -name '*.c' -o -name '*.h' \) -print0 \
-            | xargs -0 -r clang-format --dry-run --Werror
+            | xargs -0 -r clang-format --dry-run --Werror=
 
   # compilation
   build:
