@@ -35,3 +35,16 @@ Run LLSQL using the following syntax:
 
 ```bash
 ./llsql <databasename>
+```
+
+
+## Note
+
+The only supported command separator is ;.
+
+For example:
+
+command1;command2
+
+
+Pressing Enter does not execute a command or separate commands.
